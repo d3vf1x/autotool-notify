@@ -3,14 +3,18 @@
 #pip install requests
 import requests, requests.utils,  sys, traceback, pickle, os
 
+
 name = ''
 word = ''
-autotool = 'https://autotool.imn.htwk-leipzig.de/new/'
-vorlesung = "251" #in der URL
+vorlesung = "" #in der URL
 token = ''
 chatid = ''
-#dir = "/home/pi/python-autotool/"
-dir = '/home/core/workspaces/python/autotool-python/'
+
+autotool = 'https://autotool.imn.htwk-leipzig.de/new/'
+dir = "/home/pi/autotool-notify/"
+#Präfix
+message = "[🚗]\n"
+
 
 def print_log(msg, state):
   if state == 0:
@@ -43,29 +47,42 @@ def send_Message(msg):
 
 def parsePage(html):
   message = ""
-  prozent = html.partition('Das sind ')[2].partition(' Prozent.')[0]
-  von = html.partition('<p>Von ')[2].partition(' Pflichtaufgaben')[0]
-  aktuell = html.partition('Pflichtaufgaben haben Sie bis jetzt ')[2].partition(' erledigt')[0]
+  prozent = int(html.partition('Das sind ')[2].partition(' Prozent.')[0])
+  von = int(html.partition('<p>Von ')[2].partition(' Pflichtaufgaben')[0])
+  aktuell = int(html.partition('Pflichtaufgaben haben Sie bis jetzt ')[2].partition(' erledigt')[0])
+  
   if (von == "") or (aktuell == ""):
      raise Exception( "Anzahlen der Aufgaben konnten nicht gelesen werden!")
   else:
-    if prozent == 100:
-      message = "alles Erledigt!"
+
+    table = html.partition('<tbody>')[2].partition('</tbody>')[0]      
+    nein = table.count("Nein")
+   
+    print_log( "prozent" + str(nein) + " " + str(prozent),0)
+    if nein == 0 and prozent == 100:
+      message += "alles Erledigt!"
     else:
-      message = 'Es sind noch ' + str(int(von) - int(aktuell)) + ' zu erledigen!'
-      table = html.partition('<tbody>')[2].partition('</tbody>')[0]      
+      if prozent == 100:
+	message += "Es sind noch " + str(nein - (von - aktuell))  +  " optionale Aufgaben offen!"
+      else:
+	message += 'Es sind noch ' + str(von - aktuell) + ' zu erledigen!'
       hoch = table.count('Hoch')
       niedrig = table.count('Niedrig')
       keinen = table.count('Keine Highscore')
       demo = table.count('Demonstration')
-      
+      optional = table.count('Optional')
+
+      message += "\nAktuelle Aufgaben:"
+
       if hoch != 0:
         message += "\n- " + str(hoch) + " Aufgaben mit Highscore (Hoch)"
       if niedrig != 0:
         message += "\n- " + str(niedrig) + " Aufgaben mit Highscore (Niedrig)"
       if keinen != demo:
         message += "\n- " + str(keinen) + " Aufgaben ohne Highscore (Demo " + str(demo) + ")"
-      
+      if optional != 0:
+	message += "\n- " + str(optional) + " Optionale Aufgaben" 
+
       #lese alte Statusnachricht
       with open(dir + "status.txt","r") as f:
         status = ""
