@@ -1,4 +1,4 @@
 .stop*
-.cookie
+.cookies
 .status*
-.config*
+.config.ini
