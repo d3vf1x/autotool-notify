@@ -77,7 +77,7 @@ def send_Message(msg):
 
 
 def parsePage(course, html):
-    message = "Aufgabenstatus für Vorlesung " + course + "\n"
+    message = "[🚗🔧] Aufgabenstatus für Vorlesung " + course + "\n"
     prozent = int(html.partition('Das sind ')[2].partition(' Prozent.')[0])
     von = html.partition('gewichtete Punkte von ')[2].split(' ', 1)[0]
     aktuell = html.partition('Aus den bisherigen Pflicht-Aufgaben haben Sie ')[
