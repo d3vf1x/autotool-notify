@@ -2,4 +2,5 @@
 .cookies
 .status*
 .config.ini
+config.ini
 *.html
