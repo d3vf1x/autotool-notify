@@ -28,7 +28,7 @@ After each run the program will save your cookies (`.cookies`) and will try them
 The program will generate a message for every course based on the number of tasks that are still open.
 It will call the [send_Message](https://github.com/d3vf1x/autotool-notify/blob/99e20cbb1d741cb03dc90d9a082014e46b85c1e2/autotool.py#L63) with this generated message string. For example:
 `
-Aufgabenstatus für Vorlesung 309
+[🚗🔧] Aufgabenstatus für Vorlesung 309
 Alles Erledigt!
 `
 
@@ -74,11 +74,11 @@ Then just save the file and run the script again.
 [..] starte loginprozedur: https://autotool.imn.htwk-leipzig.de/new/
 [OK] login auf autotoolseite erfolgreich
 [OK] Änderung erkannt.
-[..] send: Aufgabenstatus für Vorlesung 309
+[..] send: [🚗🔧] Aufgabenstatus für Vorlesung 309
 Alles Erledigt!
 [OK] login auf autotoolseite erfolgreich
 [OK] Änderung erkannt.
-[..] send: Aufgabenstatus für Vorlesung 307
+[..] send: [🚗🔧] Aufgabenstatus für Vorlesung 307
 Alles Erledigt!
 [OK] cookies saved sucessfully
 [OK] Alle Vorlesungen überprüft,ende
