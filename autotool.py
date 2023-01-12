@@ -21,7 +21,7 @@ def init_config():
         'Password': ''}
 
     config['autotool'] = {
-        'Base-URL': 'https://autotool.imn.htwk-leipzig.de/new/',
+        'Base-URL': 'https://autotool.imn.htwk-leipzig.de',
         'Courses': '123 123'
     }
     config['shib'] = {
@@ -78,7 +78,7 @@ def send_Message(msg):
 
 def parsePage(course, html):
     message = "Aufgabenstatus für Vorlesung " + course + "\n"
-    prozent = html.partition('Das sind ')[2].partition(' Prozent.')[0]
+    prozent = int(html.partition('Das sind ')[2].partition(' Prozent.')[0])
     von = html.partition('gewichtete Punkte von ')[2].split(' ', 1)[0]
     aktuell = html.partition('Aus den bisherigen Pflicht-Aufgaben haben Sie ')[
         2].partition(' gewichtete Punkte von ')[0]
@@ -107,67 +107,80 @@ def parsePage(course, html):
                 message += "\n- " + \
                     str(keinen) + " Aufgaben ohne Highscore (Demo " + str(demo) + ")"
 
-            # read old status message
-            if os.path.isfile(dir + '.status_' + course + '.txt'):
-                with open(dir + '.status_' + course + '.txt', "r") as f:
-                    status = ""
-                    for line in f:
-                        status = status + line
-            else:
+        # read old status message
+        if os.path.isfile(dir + '.status_' + course + '.txt'):
+            with open(dir + '.status_' + course + '.txt', "r") as f:
                 status = ""
+                for line in f:
+                    status = status + line
+        else:
+            status = ""
 
-            # save new message in status file
-            if message != status:
-                print_log("Änderung erkannt.", 0)
-                send_Message(message)
-                with open(dir + ".status.txt", "w") as f:
-                    f.write(message)
-            else:
-                print_log("keine Änderung erkannt, ende.", 0)
+        # save new message in status file
+        if message != status:
+            print_log("Änderung erkannt.", 1)
+            send_Message(message)
+            with open(dir + '.status_' + course + '.txt', "w") as f:
+                f.write(message)
+        else:
+            print_log("keine Änderung für Vorlesung: " +
+                      course + " erkannt", 1)
 
 # will be called for every course in courses list
 
 
-def check_course(course):
+def check_courses(courses):
     # stops next execution if error occurs
-    if os.path.isfile(dir + ".stop_" + course + ".txt"):
-        print_log(".stop_" + course + ".txt wurde gefunden, beende", 0)
+    if os.path.isfile(dir + ".stop.txt"):
+        print_log(dir+".stop.txt wurde gefunden, beende", 0)
         return
     try:
 
         # start with new session and check old cookies
         with requests.Session() as r:
-            if os.path.isfile('.cookies'):
+            if os.path.isfile(dir + '.cookies'):
+                print_log("Gespeicherte Cookies gefunden.", 1)
                 # lade cookies
                 sessioncookies = load_cookies()
-                aktuelleAufgaben = r.get(
-                    autotool + 'courses/' + str(courses) + '/aufgaben/aktuell', cookies=sessioncookies)
-                if aktuelleAufgaben.status_code == 200:  # cookies are still valid!
-                    html = aktuelleAufgaben.text.encode('utf-8')
-                    if (str_count(html, 'Pflichtaufgaben haben Sie bis jetzt') > 0):
-                        print_log("Session weiterhin gültig", 1)
-                        parsePage(course, html)
-                        sys.exit(0)
+                url = autotool + '/new/sprache/de/HomeR'
+                languageResponse = r.get(url, cookies=sessioncookies)
+                if languageResponse.status_code == 200:
+                    for course in courses:
+                      print_log("Überprüfe Aufgaben für Vorlesung " + course + "...",0)
+                      aktuelleAufgaben = r.get(
+                          autotool + '/new/vorlesung/' + str(course) + '/aufgaben/aktuell', cookies=sessioncookies)
+                      if aktuelleAufgaben.status_code == 200:  # cookies are still valid!
+                          html = str(aktuelleAufgaben.text.encode('utf-8'))
+                          if (str_count(html, "Aus den bisherigen Pflicht-Aufgaben haben Sie") > 0):
+                              print_log("login auf autotoolseite erfolgreich", 1)
+                              parsePage(course, html)
+                    
+                          else:
+                              with open(dir + 'aktuelleAufgaben_' + course + '.html', 'w') as loginfile:
+                                  loginfile.write(loginpage.text)
+                              raise Exception("Pflichtaufgaben nicht gefunden!")
+                      else:
+                          print_log(
+                              "Aufgaben abfragen HTTP-Code=" + str(aktuelleAufgaben.status_code) + ": Session abgelaufen, erneuter Login erforderlich.", 0)
+                    print_log("Alle Vorlesungen überprüft,ende", 1)
+                    return               
                 else:
                     print_log(
-                        "Session abgelaufen, erneuter Login erforderlich.", 0)
+                        "Sprache setzen HTTP-Code=" + str(aktuelleAufgaben.status_code) + ": Session abgelaufen, erneuter Login erforderlich.", 0)
             else:
                 print_log(
-                    "keine gespeicherte Session gefunden, login erforderlich.", 0)
+                    "keine gespeicherten Cookies gefunden, login erforderlich...", 0)
 
             # erneuter Login
             with requests.Session() as s:
                 s.cookies.clear()
-                print_log("starte loginprozedur: " + autotool, 0)
+                print_log("starte loginprozedur: " + autotool + "/new/", 0)
                 # Lade Autotool seite um auf loginseite weitergeleitet zu werden um Cookies
                 # und jsessionid zu bekommen
-                loginpage = s.get(autotool)
-                with open('login.html', 'w') as loginfile:
-                    loginfile.write(loginpage.text)
+                loginpage = s.get(autotool + "/new/")
+
                 # wenn Statuscode nicht OK gib fehlermeldung aus
                 if loginpage.status_code != 200:
-                    with open('loginpage.html', 'w') as aktuelleAufgabenFile:
-                        aktuelleAufgabenFile.write(loginpage.text)
                     raise Exception(
                         "HTTP-Error: " + str(loginpage.status_code) + " Versuch Loginseite zu öffnen!\n")
 
@@ -223,32 +236,43 @@ def check_course(course):
 
                 # Login at autotool
                 postresponse = s.post(
-                    'https://autotool.imn.htwk-leipzig.de/Shibboleth.sso/SAML2/POST', data=payload, cookies=s.cookies)
+                    autotool + '/Shibboleth.sso/SAML2/POST', data=payload, cookies=s.cookies)
                 if postresponse.status_code != 200:
                     raise Exception(
                         str(postresponse.status_code) + " Bei POST zu Shibboleth:\n")
+          
 
                 # Login Button auf autotoolseite drücken
-                loginresponse = s.get(autotool + 'auth/login')
+                loginresponse = s.get(autotool + '/new/auth/login')
                 if loginresponse.status_code != 200:
                     raise Exception(
-                        "HTTP-Error: " + str(loginresponse.status_code) + " Beim Login Autotool:\n")
+                        "HTTP-Error: " + str(loginresponse.status_code) + " Beim Login Autotool\n")
 
-                # aktuelle Aufgaben seite laden
-                url = autotool + 'vorlesung/' + course + '/aufgaben/aktuell'
-                aktuelleAufgaben = s.get(url)
-                if aktuelleAufgaben.status_code != 200:
-                    raise Exception("HTTP-Error: " + str(aktuelleAufgaben.status_code) +
-                                    " Beim Aufruf der aktuellen Aufgaben: '"+url+"'\n")
+                # url = autotool + '/new/sprache/de/HomeR'
+                # languageResponse = s.get(url)
+                # if loginresponse.status_code != 200:
+                #    raise Exception(
+                #       "HTTP-Error: " + str(loginresponse.status_code) + " Beim setzen der Sprache\n")
 
-                # überprüfen ob die aufgabenübersich geladen wurde
-                html = str(aktuelleAufgaben.text.encode('utf-8'))
-                if (str_count(html, "Aus den bisherigen Pflicht-Aufgaben haben Sie") > 0):
-                    print_log("login auf autotoolseite erfolgreich", 1)
-                    save_cookies(s.cookies)
-                    parsePage(course, html)
-                else:
-                    raise Exception("Pflichtaufgaben nicht gefunden!")
+                for course in courses:
+                  # aktuelle Aufgaben seite laden
+                  url = autotool + '/new/vorlesung/' + course + '/aufgaben/aktuell'
+                  aktuelleAufgaben = s.get(url)
+                  if aktuelleAufgaben.status_code != 200:
+                      raise Exception("HTTP-Error: " + str(aktuelleAufgaben.status_code) +
+                                      " Beim Aufruf der aktuellen Aufgaben: '"+url+"'\n")
+
+                  # überprüfen ob die aufgabenübersich geladen wurde
+                  html = str(aktuelleAufgaben.text.encode('utf-8'))
+                  if (str_count(html, "Aus den bisherigen Pflicht-Aufgaben haben Sie") > 0):
+                      print_log("login auf autotoolseite erfolgreich", 1)
+                      parsePage(course, html)
+                  else:
+                      with open(dir + 'aktuelleAufgaben_' + course + '.html', 'w') as loginfile:
+                          loginfile.write(loginpage.text)
+                      raise Exception("Pflichtaufgaben nicht gefunden!")
+                save_cookies(s.cookies)
+                print_log("Alle Vorlesungen überprüft,ende", 1)
 
     except KeyboardInterrupt:
         print("Abgebrochen durch Tastatureingabe")
@@ -267,16 +291,16 @@ def str_count(string, substring):
 
 
 def main():
-    if not os.path.isfile('config.ini'):
+    if not os.path.isfile(dir + 'config.ini'):
         init_config()
-        print("Please edit the config file: 'config.ini'")
+        print("Please edit the config file: '"+dir + "config.ini'")
         exit(0)
 
     # Read config
     try:
         config = configparser.ConfigParser()
         config.sections()
-        config.read('config.ini')
+        config.read(dir + 'config.ini')
 
         global name
         name = config['HTWK-login']['Username']
@@ -307,8 +331,8 @@ def main():
         print("Invalid config file: " + repr(error))
         exit(-1)
 
-    for c in courses:
-        check_course(c)
+    
+    check_courses(courses)
 
 
 if __name__ == "__main__":
